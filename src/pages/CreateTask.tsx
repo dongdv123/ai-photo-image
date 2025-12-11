@@ -30,8 +30,8 @@ export function CreateTask() {
   };
 
   const handleProcess = async () => {
-    if (!productName || !productDescription || uploadedImages.length === 0) {
-      alert('Please fill in all fields and upload images');
+    if (!productName || uploadedImages.length === 0) {
+      alert('Please fill in product name and upload images');
       return;
     }
 
@@ -51,8 +51,8 @@ export function CreateTask() {
 
       console.log('🚀 Starting image generation process...');
       console.log(`📋 Product: ${productName}`);
-      console.log(`📝 Description: ${productDescription.substring(0, 50)}...`);
-      console.log(`🎨 Model: ${modelType}, Images: ${imageCount}, Parallel: ${useParallel}`);
+      console.log(`📝 Description: ${productDescription ? productDescription.substring(0, 50) + '...' : '(empty)'}`);
+      console.log(`🎨 Model: ${modelType}, Images: ${imageCount}, Parallel: ${useParallel}, Quality: ${qualityMode}`);
 
       // Step 1: Analyze product
       console.log('📊 Step 1: Analyzing product...');
@@ -136,7 +136,10 @@ export function CreateTask() {
   };
 
   return (
-    <div className="bg-white text-gray-900 overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 73px)' }}>
+    <div
+      className="bg-white text-gray-900 overflow-hidden flex flex-col"
+      style={{ height: 'calc(100vh - var(--header-height, 73px))' }}
+    >
       {/* Main Layout */}
       <div className="flex flex-1 min-h-0">
         {/* Left Panel - Controls */}
@@ -145,7 +148,7 @@ export function CreateTask() {
           <div className="p-4 border-b border-gray-200 bg-white flex gap-3">
             <button
               onClick={handleProcess}
-              disabled={isAnalyzing || isGenerating || !productName || !productDescription || uploadedImages.length === 0}
+              disabled={isAnalyzing || isGenerating || !productName || uploadedImages.length === 0}
               className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -181,7 +184,7 @@ export function CreateTask() {
                   <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
                   </svg>
-                  Describe your product *
+                  Describe your product
                 </label>
                 <textarea
                   value={productDescription}
@@ -382,7 +385,7 @@ export function CreateTask() {
               {/* Generate Button */}
               <button
                 onClick={handleProcess}
-                disabled={isAnalyzing || isGenerating || !productName || !productDescription || uploadedImages.length === 0}
+                disabled={isAnalyzing || isGenerating || !productName || uploadedImages.length === 0}
                 className="w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 text-lg"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -5,8 +5,8 @@ export function Header() {
   const location = useLocation();
 
   return (
-    <header className="border-b border-gray-200 bg-white px-6 py-4 shadow-sm sticky top-0 z-50">
-      <div className="flex justify-between items-center max-w-7xl mx-auto">
+    <header className="border-b border-gray-200 bg-white w-full px-6 py-4 shadow-sm sticky top-0 z-50">
+      <div className="flex justify-between items-center w-full">
         <button
           onClick={() => navigate('/')}
           className="text-2xl font-bold bg-gradient-to-r from-purple-500 to-purple-600 bg-clip-text text-transparent hover:from-purple-400 hover:to-purple-500 transition-all"

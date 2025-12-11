@@ -252,7 +252,7 @@ export async function analyzeProductAndGenerateSeo(
   }
 
   const prompt = ANALYST_PROMPT_TEMPLATE
-    .replace('{PRODUCT_DESCRIPTION}', productDescription);
+    .replace('{PRODUCT_DESCRIPTION}', productDescription || 'No description provided. Analyze the product based on the images only.');
   
   const modelName = getModelName(modelType, 'analysis');
   console.log(`🔍 Using model: ${modelName} (${modelType} mode)`);
@@ -316,11 +316,20 @@ export async function generateProductImage(
     throw new Error('Gemini API key is not configured');
   }
 
-  const modelName = getModelName(modelType, 'image');
-  console.log(`🎨 Using image model: ${modelName} (${modelType} mode)`);
+  // For Pro mode, try gemini-3.0-pro-image first, fallback to flash-image
+  let modelName = getModelName(modelType, 'image');
+  const shouldTryProImage = modelType === 'pro';
+  
+  if (shouldTryProImage) {
+    // Try gemini-3.0-pro-image first for Pro mode
+    modelName = 'gemini-3.0-pro-image';
+    console.log(`🎨 Attempting Pro image model: ${modelName} (${modelType} mode)`);
+  } else {
+    console.log(`🎨 Using image model: ${modelName} (${modelType} mode)`);
+  }
+  
   console.log(`📡 API: Google Generative AI SDK (@google/generative-ai)`);
   console.log(`🌐 Endpoint: https://generativelanguage.googleapis.com`);
-  const model = genAI.getGenerativeModel({ model: modelName });
   
   const parts = [
     ...referenceImages.map(img => ({
@@ -332,46 +341,99 @@ export async function generateProductImage(
     { text: prompt }
   ];
   
-  const result = await model.generateContent({
-    contents: [{ role: 'user', parts }]
-  });
+  try {
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts }]
+    });
+    
+    const response = await result.response;
   
-  const response = await result.response;
-  
-  // Extract image from response
-  // Gemini API returns images in response.candidates[0].content.parts[]
-  // Each part can be either text or inlineData (for images)
-  const candidates = response.candidates;
-  
-  if (!candidates || candidates.length === 0) {
-    throw new Error('No candidates in API response');
+    // Extract image from response
+    // Gemini API returns images in response.candidates[0].content.parts[]
+    // Each part can be either text or inlineData (for images)
+    const candidates = response.candidates;
+    
+    if (!candidates || candidates.length === 0) {
+      throw new Error('No candidates in API response');
+    }
+    
+    // Check for finish reason
+    const finishReason = candidates[0].finishReason;
+    if (finishReason && finishReason !== 'STOP') {
+      throw new Error(`Image generation stopped: ${finishReason}`);
+    }
+    
+    const responseParts = candidates[0].content?.parts;
+    if (!responseParts || responseParts.length === 0) {
+      throw new Error('No parts in API response');
+    }
+    
+    // Find image part (inlineData)
+    const imagePart = responseParts.find((part: any) => part.inlineData);
+    
+    if (imagePart?.inlineData) {
+      const imageData = imagePart.inlineData;
+      return {
+        mimeType: imageData.mimeType || 'image/png',
+        data: imageData.data
+      };
+    }
+    
+    // If no image found, log response for debugging
+    console.error('Response structure:', JSON.stringify(response, null, 2));
+    throw new Error('Failed to extract image from response - no inlineData found in parts');
+  } catch (error: any) {
+    // Fallback for Pro mode: if gemini-3.0-pro-image fails, use flash-image
+    if (shouldTryProImage && (error.message?.includes('not found') || error.message?.includes('not available') || error.message?.includes('404') || error.message?.includes('model') || error.code === 404)) {
+      console.warn(`⚠️ Pro image model (gemini-3.0-pro-image) not available, falling back to gemini-2.5-flash-image`);
+      modelName = 'gemini-2.5-flash-image';
+      console.log(`🎨 Using fallback image model: ${modelName}`);
+      
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts }]
+        });
+        
+        const response = await result.response;
+        const candidates = response.candidates;
+        
+        if (!candidates || candidates.length === 0) {
+          throw new Error('No candidates in API response');
+        }
+        
+        const finishReason = candidates[0].finishReason;
+        if (finishReason && finishReason !== 'STOP') {
+          throw new Error(`Image generation stopped: ${finishReason}`);
+        }
+        
+        const responseParts = candidates[0].content?.parts;
+        if (!responseParts || responseParts.length === 0) {
+          throw new Error('No parts in API response');
+        }
+        
+        const imagePart = responseParts.find((part: any) => part.inlineData);
+        
+        if (imagePart?.inlineData) {
+          const imageData = imagePart.inlineData;
+          return {
+            mimeType: imageData.mimeType || 'image/png',
+            data: imageData.data
+          };
+        }
+        
+        throw new Error('Failed to extract image from response - no inlineData found in parts');
+      } catch (fallbackError: any) {
+        // If fallback also fails, throw original error
+        console.error('Fallback model also failed:', fallbackError);
+        throw error;
+      }
+    }
+    
+    // Re-throw original error if not a fallback case
+    throw error;
   }
-  
-  // Check for finish reason
-  const finishReason = candidates[0].finishReason;
-  if (finishReason && finishReason !== 'STOP') {
-    throw new Error(`Image generation stopped: ${finishReason}`);
-  }
-  
-  const responseParts = candidates[0].content?.parts;
-  if (!responseParts || responseParts.length === 0) {
-    throw new Error('No parts in API response');
-  }
-  
-  // Find image part (inlineData)
-  const imagePart = responseParts.find((part: any) => part.inlineData);
-  
-  if (imagePart?.inlineData) {
-    const imageData = imagePart.inlineData;
-    return {
-      mimeType: imageData.mimeType || 'image/png',
-      data: imageData.data
-    };
-  }
-  
-  // If no image found, log response for debugging
-  console.error('Response structure:', JSON.stringify(response, null, 2));
-  throw new Error('Failed to extract image from response - no inlineData found in parts');
 }
 
 /**
@@ -443,21 +505,26 @@ export function constructPromptsFromPlan(
 - High-end composition with perfect framing and attention to every detail
 - Rich textures, depth, and professional polish
 - Maximum detail preservation and clarity
-- Sophisticated color grading and post-processing effects`;
+- Sophisticated color grading and post-processing effects
+- Take time to ensure every element is perfect and polished`;
   } else if (qualityMode === 'fast') {
     qualityInstruction = `QUALITY MODE: FAST - Create a good quality image quickly with:
 - Standard studio lighting setup (simple and effective)
 - Clean composition focusing on the product
 - Good detail but optimized for speed
-- Efficient processing without excessive refinement`;
+- Efficient processing without excessive refinement
+- Balance quality and speed effectively`;
   } else if (qualityMode === 'simple') {
     qualityInstruction = `QUALITY MODE: SIMPLE - Create a clean, straightforward image with:
 - Minimal lighting setup (natural and simple)
 - Clean, uncluttered composition
 - Focus on product clarity without complex effects
 - Simple background and straightforward presentation
-- Easy to process and fast to generate`;
+- Easy to process and fast to generate
+- Keep it simple and clear`;
   }
+  
+  console.log(`🎨 Quality Mode: ${qualityMode.toUpperCase()} - ${qualityMode === 'professional' ? 'Highest quality' : qualityMode === 'fast' ? 'Balanced speed/quality' : 'Simple and fast'}`);
 
   return plan.map((item, index) => {
     const materialsText = JSON.stringify(analysis.analysis.materials);
@@ -466,7 +533,7 @@ export function constructPromptsFromPlan(
     const uniquenessNote = `IMPORTANT: This is image ${index + 1} of ${plan.length} in the series. It MUST be visually distinct and unique from the other ${plan.length - 1} image(s). Use the EXACT angle and background specified below, and ensure the visual style is COMPLETELY DIFFERENT.\n\n`;
     
     let prompt = STUDIO_PHOTOGRAPHER_PROMPT_TEMPLATE
-      .replace('{PRODUCT_DESCRIPTION}', productDescription)
+      .replace('{PRODUCT_DESCRIPTION}', productDescription || 'No description provided. Use the reference images to understand the product.')
       .replace('{REFERENCE_IMAGES_INSTRUCTION}', referenceInstruction)
       .replace('{QUALITY_MODE_INSTRUCTION}', qualityInstruction)
       .replace('{ANGLE}', item.angle)

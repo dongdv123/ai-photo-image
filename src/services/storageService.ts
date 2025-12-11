@@ -138,6 +138,35 @@ export async function loadTasksLazy(
 }
 
 /**
+ * Update task
+ */
+export async function updateTask(task: Task): Promise<void> {
+  const db = await initDB();
+  
+  // Update task metadata (without images)
+  const taskMetadata = {
+    ...task,
+    generatedImages: [] // Remove images từ task
+  };
+  
+  await db.put(STORE_TASKS, taskMetadata);
+  
+  // Delete old images
+  const oldImages = await db.getAllFromIndex(STORE_IMAGES, 'taskId', task.id);
+  await Promise.all(oldImages.map(img => db.delete(STORE_IMAGES, img.id)));
+  
+  // Save new images
+  for (let i = 0; i < task.generatedImages.length; i++) {
+    await db.put(STORE_IMAGES, {
+      id: `${task.id}-${i}`,
+      taskId: task.id,
+      imageIndex: i,
+      data: task.generatedImages[i]
+    });
+  }
+}
+
+/**
  * Delete task
  */
 export async function deleteTask(taskId: string): Promise<void> {
