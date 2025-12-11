@@ -46,6 +46,8 @@ export type ErrorType = 'RATE_LIMIT' | 'QUOTA_EXCEEDED' | 'NETWORK_ERROR' | 'UNK
 
 export type GeminiModel = 'flash' | 'pro' | 'auto';
 
+export type QualityMode = 'professional' | 'fast' | 'simple';
+
 export interface ModelSettings {
   analysisModel: GeminiModel;
   imageModel: GeminiModel;

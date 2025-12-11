@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { Base64Image, AnalysisResult, ImagePlan, GeminiModel } from '../types';
+import { Base64Image, AnalysisResult, ImagePlan, GeminiModel, QualityMode } from '../types';
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -123,7 +123,7 @@ Output Format: Strict JSON schema:
 
 // Phase 2: Studio Photographer Prompt Template
 const STUDIO_PHOTOGRAPHER_PROMPT_TEMPLATE = `
-Task: Create a professional marketing photo.
+Task: Create a UNIQUE professional marketing photo. This image must be DISTINCTLY DIFFERENT from any other images in the series.
 
 Product Description: {PRODUCT_DESCRIPTION}
 
@@ -132,9 +132,24 @@ Input: Use provided images as reference.
 
 Core Requirement: RECREATE the product in a completely new photograph that reflects the product description.
 
+!!! UNIQUENESS REQUIREMENT !!!
+This specific image MUST be visually distinct and unique:
+- Use the EXACT angle specified: {ANGLE}
+- Use the EXACT background specified: {BACKGROUND}
+- Create a COMPLETELY DIFFERENT composition, lighting, and visual style from other images
+- Ensure this image stands out as unique when compared to other images in the series
+
 Angle: {ANGLE}
+- This angle is SPECIFIC and DIFFERENT from other images
+- The camera position and perspective must match this exact description
+- Do NOT use similar angles to other images
 
 Background: {BACKGROUND}
+- This background is SPECIFIC and DIFFERENT from other images
+- The background color, texture, and style must be DISTINCTLY DIFFERENT
+- Do NOT use similar backgrounds to other images (e.g., if another image has white background, this one MUST be different)
+
+{QUALITY_MODE_INSTRUCTION}
 
 !!! CRITICALLY IMPORTANT REQUIREMENTS !!!
 
@@ -152,11 +167,13 @@ Product Details (from Analysis):
 - Basic Shape: {SKETCH}
 - Key Materials: {MATERIALS}
 
-Lighting: Professional studio lighting with natural shadows that matches the "{VIBE}" vibe.
+Lighting: Professional studio lighting with natural shadows that matches the "{VIBE}" vibe. The lighting setup should be UNIQUE and DIFFERENT from other images in the series.
 
-Composition: Follow rule of thirds, ensure product is the focal point. The composition should enhance the "{VIBE}" mood.
+Composition: Follow rule of thirds, ensure product is the focal point. The composition should enhance the "{VIBE}" mood. The composition MUST be DISTINCTLY DIFFERENT from other images.
 
-Style: The image style must clearly convey "{VIBE}" - make it unmistakable and consistent throughout.
+Style: The image style must clearly convey "{VIBE}" - make it unmistakable and consistent throughout. However, the visual execution must be UNIQUE compared to other images.
+
+REMEMBER: This image must be VISUALLY DISTINCT and UNIQUE. If you see other images with similar backgrounds or angles, this one MUST be different.
 `;
 
 /**
@@ -226,7 +243,7 @@ function parseAnalysisResponse(responseText: string): AnalysisResult {
  */
 export async function analyzeProductAndGenerateSeo(
   images: Base64Image[],
-  productName: string,
+  _productName: string, // Not used in prompt, kept for function signature
   productDescription: string,
   modelType: GeminiModel = 'auto'
 ): Promise<AnalysisResult> {
@@ -363,34 +380,34 @@ export async function generateProductImage(
 export function createImageGenerationPlan(count: number = 4): ImagePlan[] {
   const allPlans: ImagePlan[] = [
     {
-      angle: 'straight-on front view',
-      background: 'clean white studio background',
-      description: 'Professional front-facing product shot'
+      angle: 'straight-on front view, product centered and facing directly at camera',
+      background: 'bright white studio background with subtle soft shadows, professional product photography style',
+      description: 'Professional front-facing product shot with clean white background'
     },
     {
-      angle: 'side profile view',
-      background: 'minimalist gray gradient',
-      description: 'Side view showcasing product depth'
+      angle: 'side profile view from the left, showing product depth and dimensions',
+      background: 'warm beige or light gray gradient background with depth, creating elegant contrast',
+      description: 'Side view showcasing product depth with warm gradient background'
     },
     {
-      angle: '45-degree perspective',
-      background: 'lifestyle setting with natural elements',
-      description: 'Dynamic angled view'
+      angle: '45-degree perspective from upper right, dynamic three-dimensional view',
+      background: 'lifestyle setting with natural wood texture or marble surface, warm ambient lighting',
+      description: 'Dynamic angled view with lifestyle background'
     },
     {
-      angle: 'top-down overhead view',
-      background: 'marble surface with soft shadows',
-      description: 'Flat lay composition'
+      angle: 'top-down overhead view, bird\'s eye perspective, product flat lay style',
+      background: 'marble or concrete surface with natural texture, soft directional shadows creating depth',
+      description: 'Flat lay composition with textured surface'
     },
     {
-      angle: 'close-up detail view',
-      background: 'dramatic lighting',
-      description: 'Highlight texture and material details'
+      angle: 'close-up detail view focusing on key features, macro photography style',
+      background: 'dark dramatic background with spotlight effect, high contrast lighting',
+      description: 'Close-up detail view with dramatic lighting'
     },
     {
-      angle: 'three-quarter view',
-      background: 'soft focus background',
-      description: 'Showcasing product from multiple angles'
+      angle: 'three-quarter view from lower left, showing both front and side simultaneously',
+      background: 'soft bokeh background with blurred colorful elements, shallow depth of field',
+      description: 'Three-quarter view with bokeh background'
     }
   ];
   
@@ -405,9 +422,10 @@ export function constructPromptsFromPlan(
   plan: ImagePlan[],
   analysis: AnalysisResult,
   vibe: string,
-  productName: string, // Kept for function signature but not used in prompt
+  _productName: string, // Not used in prompt, kept for function signature
   productDescription: string,
-  referenceImageCount: number = 1
+  referenceImageCount: number = 1,
+  qualityMode: QualityMode = 'professional'
 ): string[] {
   // Tạo instruction về ảnh reference dựa trên số lượng
   let referenceInstruction = '';
@@ -417,17 +435,50 @@ export function constructPromptsFromPlan(
     referenceInstruction = `IMPORTANT: The FIRST image is the PRIMARY/MAIN reference image. Use it as the dominant source for product structure, main features, and core appearance. The additional ${referenceImageCount - 1} image(s) should be merged/blended into the primary image to add supplementary details, alternative angles, or complementary features. Prioritize the primary image while incorporating relevant elements from the additional images.`;
   }
 
-  return plan.map(item => {
+  // Tạo instruction về quality mode
+  let qualityInstruction = '';
+  if (qualityMode === 'professional') {
+    qualityInstruction = `QUALITY MODE: PROFESSIONAL - Create the highest quality, most detailed image possible. Use:
+- Premium studio lighting with multiple light sources and carefully crafted shadows
+- High-end composition with perfect framing and attention to every detail
+- Rich textures, depth, and professional polish
+- Maximum detail preservation and clarity
+- Sophisticated color grading and post-processing effects`;
+  } else if (qualityMode === 'fast') {
+    qualityInstruction = `QUALITY MODE: FAST - Create a good quality image quickly with:
+- Standard studio lighting setup (simple and effective)
+- Clean composition focusing on the product
+- Good detail but optimized for speed
+- Efficient processing without excessive refinement`;
+  } else if (qualityMode === 'simple') {
+    qualityInstruction = `QUALITY MODE: SIMPLE - Create a clean, straightforward image with:
+- Minimal lighting setup (natural and simple)
+- Clean, uncluttered composition
+- Focus on product clarity without complex effects
+- Simple background and straightforward presentation
+- Easy to process and fast to generate`;
+  }
+
+  return plan.map((item, index) => {
     const materialsText = JSON.stringify(analysis.analysis.materials);
     
-    return STUDIO_PHOTOGRAPHER_PROMPT_TEMPLATE
+    // Thêm instruction về uniqueness dựa trên index
+    const uniquenessNote = `IMPORTANT: This is image ${index + 1} of ${plan.length} in the series. It MUST be visually distinct and unique from the other ${plan.length - 1} image(s). Use the EXACT angle and background specified below, and ensure the visual style is COMPLETELY DIFFERENT.\n\n`;
+    
+    let prompt = STUDIO_PHOTOGRAPHER_PROMPT_TEMPLATE
       .replace('{PRODUCT_DESCRIPTION}', productDescription)
       .replace('{REFERENCE_IMAGES_INSTRUCTION}', referenceInstruction)
+      .replace('{QUALITY_MODE_INSTRUCTION}', qualityInstruction)
       .replace('{ANGLE}', item.angle)
       .replace('{BACKGROUND}', item.background)
       .replace(/{VIBE}/g, vibe) // Replace all occurrences of VIBE
       .replace('{SKETCH}', analysis.analysis.sketch)
       .replace('{MATERIALS}', materialsText);
+    
+    // Thêm note về uniqueness ở đầu prompt
+    prompt = uniquenessNote + prompt;
+    
+    return prompt;
   });
 }
 

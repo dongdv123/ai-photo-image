@@ -1,10 +1,8 @@
-import { ImageGrid } from '../components/ImageGrid';
 import { useTaskStorage } from '../hooks/useTaskStorage';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export function TaskList() {
-  const navigate = useNavigate();
-  const { tasks, hasMore, isLoading, deleteTask, loadMore } = useTaskStorage('user-1');
+  const { tasks, hasMore, isLoading, loadMore } = useTaskStorage('user-1');
 
   return (
     <div className="min-h-screen bg-white text-gray-900">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Base64Image, AnalysisResult, GeminiModel } from '../types';
+import { Base64Image, AnalysisResult, GeminiModel, QualityMode } from '../types';
 import { analyzeProductAndGenerateSeo, generateProductImage, createImageGenerationPlan, constructPromptsFromPlan } from '../services/geminiService';
 import { retryWithSmartBackoff } from '../utils/retry';
 import { analysisCache } from '../utils/cache';
@@ -14,6 +14,7 @@ export function useImageGeneration() {
   const [modelType, setModelType] = useState<GeminiModel>('auto');
   const [imageCount, setImageCount] = useState<number>(4);
   const [useParallel, setUseParallel] = useState<boolean>(true);
+  const [qualityMode, setQualityMode] = useState<QualityMode>('professional');
 
   const analyzeProduct = async (
     images: Base64Image[],
@@ -64,7 +65,8 @@ export function useImageGeneration() {
     productDescription: string,
     vibe: string,
     imageCountParam?: number,
-    useParallelParam?: boolean
+    useParallelParam?: boolean,
+    qualityModeParam?: QualityMode
   ) => {
     setIsGenerating(true);
     setError(null);
@@ -73,10 +75,11 @@ export function useImageGeneration() {
     try {
       const effectiveImageCount = imageCountParam || imageCount;
       const effectiveUseParallel = useParallelParam !== undefined ? useParallelParam : useParallel;
+      const effectiveQualityMode = qualityModeParam || qualityMode;
       
       // Create plan với số lượng ảnh được chọn
       const plan = createImageGenerationPlan(effectiveImageCount);
-      const prompts = constructPromptsFromPlan(plan, analysis, vibe, productName, productDescription, images.length);
+      const prompts = constructPromptsFromPlan(plan, analysis, vibe, productName, productDescription, images.length, effectiveQualityMode);
 
       setGenerationProgress({ current: 0, total: prompts.length });
 
@@ -191,6 +194,8 @@ export function useImageGeneration() {
     setImageCount,
     useParallel,
     setUseParallel,
+    qualityMode,
+    setQualityMode,
     analyzeProduct,
     generateImages,
     reset,

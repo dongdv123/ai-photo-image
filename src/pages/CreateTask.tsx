@@ -19,8 +19,9 @@ export function CreateTask() {
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [imageUploadKey, setImageUploadKey] = useState(0);
   
-  const { isAnalyzing, isGenerating, generatedImages, generationProgress, error, modelType, setModelType, imageCount, setImageCount, useParallel, setUseParallel, analyzeProduct, generateImages, reset } = useImageGeneration();
+  const { isAnalyzing, isGenerating, generatedImages, generationProgress, error, modelType, setModelType, imageCount, setImageCount, useParallel, setUseParallel, qualityMode, setQualityMode, analyzeProduct, generateImages, reset } = useImageGeneration();
   const { addTask } = useTaskStorage('user-1');
   const { setLoading, setError } = useStore();
 
@@ -73,7 +74,8 @@ export function CreateTask() {
         productDescription,
         vibe || 'professional',
         imageCount,
-        useParallel
+        useParallel,
+        qualityMode
       );
       console.log(`✅ Generated ${generated.length} images`);
 
@@ -121,6 +123,8 @@ export function CreateTask() {
       setProductDescription('');
       setVibe('');
       setUploadedImages([]);
+      // Reset ImageUpload component by changing key
+      setImageUploadKey(prev => prev + 1);
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to process images';
       console.error('❌ Error during image generation:', err);
@@ -208,7 +212,7 @@ export function CreateTask() {
                   Upload Images (1-3 images) *
                 </label>
                 <div className="bg-white border border-gray-300 rounded-lg p-4">
-                  <ImageUpload onImagesUploaded={handleImagesUploaded} />
+                  <ImageUpload key={imageUploadKey} onImagesUploaded={handleImagesUploaded} />
                 </div>
               </div>
 
@@ -286,6 +290,67 @@ export function CreateTask() {
                   <option value={5}>5 images</option>
                   <option value={6}>6 images</option>
                 </select>
+              </div>
+
+              {/* Quality Mode */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Quality Mode
+                </label>
+                <select
+                  value={qualityMode}
+                  onChange={(e) => setQualityMode(e.target.value as 'professional' | 'fast' | 'simple')}
+                  className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
+                >
+                  <option value="professional">🎯 Professional - Highest Quality</option>
+                  <option value="fast">⚡ Fast - Quick & Good Quality</option>
+                  <option value="simple">✨ Simple - Clean & Straightforward</option>
+                </select>
+                {/* Quality Mode Description */}
+                <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
+                  {qualityMode === 'professional' && (
+                    <div>
+                      <p className="font-medium text-gray-700 mb-1">🎯 Chế độ Chuyên nghiệp:</p>
+                      <ul className="list-disc list-inside space-y-0.5 ml-2">
+                        <li>Chất lượng cao nhất với chi tiết tối đa</li>
+                        <li>Ánh sáng studio cao cấp với nhiều nguồn sáng</li>
+                        <li>Composition hoàn hảo và chuyên nghiệp</li>
+                        <li>Texture và độ sâu phong phú</li>
+                        <li>Color grading và hiệu ứng tinh tế</li>
+                        <li>⏱️ Thời gian: Lâu hơn</li>
+                        <li>💡 Tốt nhất cho: Sản phẩm cao cấp, marketing chuyên nghiệp</li>
+                      </ul>
+                    </div>
+                  )}
+                  {qualityMode === 'fast' && (
+                    <div>
+                      <p className="font-medium text-gray-700 mb-1">⚡ Chế độ Nhanh:</p>
+                      <ul className="list-disc list-inside space-y-0.5 ml-2">
+                        <li>Chất lượng tốt với tốc độ tối ưu</li>
+                        <li>Ánh sáng studio tiêu chuẩn, đơn giản và hiệu quả</li>
+                        <li>Composition sạch sẽ, tập trung vào sản phẩm</li>
+                        <li>Chi tiết tốt nhưng tối ưu cho tốc độ</li>
+                        <li>Xử lý hiệu quả không cần tinh chỉnh quá mức</li>
+                        <li>⏱️ Thời gian: Nhanh</li>
+                        <li>💡 Tốt nhất cho: Tạo nhiều ảnh, cần nhanh</li>
+                      </ul>
+                    </div>
+                  )}
+                  {qualityMode === 'simple' && (
+                    <div>
+                      <p className="font-medium text-gray-700 mb-1">✨ Chế độ Đơn giản:</p>
+                      <ul className="list-disc list-inside space-y-0.5 ml-2">
+                        <li>Ảnh sạch sẽ, đơn giản và rõ ràng</li>
+                        <li>Ánh sáng tối thiểu, tự nhiên và đơn giản</li>
+                        <li>Composition sạch, không rối mắt</li>
+                        <li>Tập trung vào độ rõ của sản phẩm</li>
+                        <li>Background đơn giản, trình bày trực tiếp</li>
+                        <li>⏱️ Thời gian: Rất nhanh</li>
+                        <li>💡 Tốt nhất cho: Ảnh catalog, cần đơn giản, tốc độ cao</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Parallel Generation Toggle */}
